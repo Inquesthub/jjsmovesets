@@ -1,0 +1,435 @@
+local P=game:GetService("Players") local RS=game:GetService("ReplicatedStorage") local RN=game:GetService("RunService") local UI=game:GetService("UserInputService") local TS=game:GetService("TweenService")
+
+local pl=P.LocalPlayer local pg=pl:WaitForChild("PlayerGui") local ch=workspace:WaitForChild("Characters") local ef=workspace:WaitForChild("Effects",15)
+
+local DC=Color3.fromRGB(128,126,255)
+
+local isMus,musS=false,nil local isDash,dashCD=false,false
+
+local isFly,sk3,lastHit,sk3T,flyTh=false,false,0,0,nil local hitC,animT=false,nil
+
+local lockE,sk1A=nil,false local hitConf=false
+
+local rushMode="Lock" local rushBV=nil local lockedTarget=nil local rushCD=nil
+
+local dashAA=false local dashT2=nil
+
+local function showNotif()
+
+    local sg=Instance.new("ScreenGui",pg) sg.Name="LoadNotif" sg.ResetOnSpawn=false
+
+    local frame=Instance.new("Frame",sg)
+
+    frame.Size=UDim2.new(0,300,0,80) frame.Position=UDim2.new(0.5,-150,-0.1,0)
+
+    frame.BackgroundColor3=Color3.fromRGB(20,20,20) frame.BackgroundTransparency=0.2 frame.BorderSizePixel=0
+
+    Instance.new("UICorner",frame).CornerRadius=UDim.new(0,10)
+
+    local icon=Instance.new("ImageLabel",frame) icon.Size=UDim2.new(0,50,0,50) icon.Position=UDim2.new(0,10,0.5,-25) icon.BackgroundTransparency=1 icon.Image="rbxassetid://7072706620"
+
+    local title=Instance.new("TextLabel",frame) title.Size=UDim2.new(1,-70,0,30) title.Position=UDim2.new(0,65,0,8) title.BackgroundTransparency=1 title.Text="made by inquestor420" title.TextColor3=Color3.new(1,1,1) title.TextScaled=true title.Font=Enum.Font.GothamBold title.TextXAlignment=Enum.TextXAlignment.Left
+
+    local desc=Instance.new("TextLabel",frame) desc.Size=UDim2.new(1,-70,0,25) desc.Position=UDim2.new(0,65,0,38) desc.BackgroundTransparency=1 desc.Text="To change the Rush mode, you need to press it twice." desc.TextColor3=Color3.fromRGB(180,180,180) desc.TextScaled=true desc.Font=Enum.Font.Gotham desc.TextXAlignment=Enum.TextXAlignment.Left
+
+    TS:Create(frame,TweenInfo.new(0.5,Enum.EasingStyle.Back),{Position=UDim2.new(0.5,-150,0.05,0)}):Play()
+
+    task.wait(4)
+
+    TS:Create(frame,TweenInfo.new(0.5,Enum.EasingStyle.Quad),{Position=UDim2.new(0.5,-150,-0.15,0)}):Play()
+
+    task.wait(0.5) sg:Destroy()
+
+end
+
+task.spawn(showNotif)
+
+local function gmv() local m=pg:FindFirstChild("Main") or pg:FindFirstChild("MainGui") return m and m:FindFirstChild("Moveset",true) end
+
+local function getNear(root,maxD)
+
+    maxD=maxD or 60 local n,d=nil,math.huge
+
+    for _,ec in ipairs(ch:GetChildren()) do if ec.Name~=pl.Name then local eh=ec:FindFirstChildOfClass("Humanoid") local er=ec:FindFirstChild("HumanoidRootPart") or ec:FindFirstChild("Torso") if eh and eh.Health>0 and er then local dd=(root.Position-er.Position).Magnitude if dd<d and dd<maxD then d=dd n=er end end end end
+
+    return n
+
+end
+
+local function stopDashNow()
+
+    isDash=false dashAA=false
+
+    if dashT2 then dashT2:Stop(0.1) dashT2=nil end
+
+    if rushBV then rushBV.Velocity=Vector3.new(0,0,0) rushBV:Destroy() rushBV=nil end
+
+    lockedTarget=nil dashCD=true
+
+    if rushCD then rushCD.Size=UDim2.new(1,0,1,0) rushCD.BackgroundColor3=Color3.fromRGB(0,180,255) rushCD.BackgroundTransparency=0.3 TS:Create(rushCD,TweenInfo.new(22,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
+
+    task.delay(15,function() dashCD=false end)
+
+end
+
+local function music(tip)
+
+    if not isMus then isMus=true if tip then tip.Text="Stop" end musS=Instance.new("Sound") musS.SoundId="rbxassetid://123462196064122" musS.Volume=5 musS.Parent=(pl.Character and pl.Character:FindFirstChild("HumanoidRootPart")) or pg musS:Play()
+
+    else isMus=false if tip then tip.Text="Play" end if musS then musS:Destroy() musS=nil end end
+
+end
+
+local function img(char)
+
+    local m=Instance.new("Model",workspace)
+
+    for _,p in ipairs(char:GetChildren()) do
+
+        if not(p:IsA("BasePart") or p:IsA("MeshPart")) or p.Name:lower()=="humanoidrootpart" then continue end
+
+        local c=p:Clone() c.Anchored=false c.CanCollide=false c.Massless=true c.CFrame=p.CFrame c.AssemblyLinearVelocity=p.AssemblyLinearVelocity*0.2 c.Transparency=0.6 c.Material=Enum.Material.Neon c.Color=DC
+
+        if p.Name:lower():find("leg") then c.Transparency=0.5 Instance.new("PointLight",c).Color=DC end
+
+        for _,ch2 in ipairs(c:GetChildren()) do if not ch2:IsA("PointLight") then ch2:Destroy() end end c.Parent=m
+
+    end
+
+    task.spawn(function() for i=1,7 do for _,p in ipairs(m:GetChildren()) do if p:IsA("BasePart") then pcall(function() p.Transparency=0.6+i/7*0.4 end) end end task.wait(0.03) end m:Destroy() end)
+
+end
+
+local function smoke(root)
+
+    local p=Instance.new("Part",workspace) p.Anchored,p.CanCollide,p.Transparency=true,false,1 p.Size=Vector3.new(1,1,1) p.CFrame=root.CFrame*CFrame.new(0,-2,0)
+
+    local e=Instance.new("ParticleEmitter",Instance.new("Attachment",p)) e.Color=ColorSequence.new(DC) e.LightEmission=0.5
+
+    e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(1,0)}) e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0.5),NumberSequenceKeypoint.new(1,1)})
+
+    e.Lifetime=NumberRange.new(0.2,0.4) e.Speed=NumberRange.new(1,3) e.Rate=0 e:Emit(8) task.delay(0.5,function() p:Destroy() end)
+
+end
+
+local function dash(cd)
+
+    if isDash or dashCD then return end
+
+    local char=ch:FindFirstChild(pl.Name) local root=char and char:FindFirstChild("HumanoidRootPart") local hum=char and char:FindFirstChildOfClass("Humanoid") if not root or not hum then return end
+
+    isDash=true dashCD=true rushCD=cd
+
+    if cd then cd.Size=UDim2.new(1,0,1,0) cd.BackgroundColor3=Color3.fromRGB(0,180,255) cd.BackgroundTransparency=0.3 TS:Create(cd,TweenInfo.new(22,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
+
+    task.spawn(function()
+
+        local cam=workspace.CurrentCamera local fov=cam.FieldOfView local an=RS.Animations.Gojo.ShortVoid local anim=hum:FindFirstChildOfClass("Animator") or hum:WaitForChild("Animator")
+
+        local t1=anim:LoadAnimation(an) t1.Priority=Enum.AnimationPriority.Action4 t1:Play(0) t1.TimePosition=3.56
+
+        TS:Create(cam,TweenInfo.new(0.2),{FieldOfView=fov+40}):Play() task.wait(1.5) t1:Stop(0.1) TS:Create(cam,TweenInfo.new(0.1),{FieldOfView=fov}):Play()
+
+        if not isDash then return end
+
+        rushBV=Instance.new("BodyVelocity",root) rushBV.MaxForce=Vector3.new(1e6,0,1e6)
+
+        if rushMode=="Lock" then
+
+            lockedTarget=getNear(root,60)
+
+            if lockedTarget then local dir=(lockedTarget.Position-root.Position)*Vector3.new(1,0,1) if dir.Magnitude>0 then root.CFrame=CFrame.new(root.Position,Vector3.new(lockedTarget.Position.X,root.Position.Y,lockedTarget.Position.Z)) rushBV.Velocity=dir.Unit*150 else rushBV.Velocity=root.CFrame.LookVector*Vector3.new(1,0,1)*150 end
+
+            else rushBV.Velocity=root.CFrame.LookVector*Vector3.new(1,0,1)*150 end
+
+        else lockedTarget=nil rushBV.Velocity=root.CFrame.LookVector*Vector3.new(1,0,1)*150 end
+
+        local rs=Instance.new("Sound",root) rs.SoundId="rbxassetid://115962892067823" rs.Volume=5 rs:Play()
+
+        dashT2=anim:LoadAnimation(an) dashT2.Priority=Enum.AnimationPriority.Action4 dashAA=true
+
+        task.spawn(function() while dashAA do dashT2:Play(0) dashT2.TimePosition=8.34 while dashAA do if dashT2.TimePosition>=11.41 then dashT2:Stop(0) break end task.wait(0.03) end end end)
+
+        task.spawn(function() while isDash do if not rs.IsPlaying then rs:Play() end task.wait(0.1) end rs:Stop() rs:Destroy() end)
+
+        local et=tick()+5 local ai,sm=0,0
+
+        while tick()<et and isDash do
+
+            if rushMode=="Lock" then
+
+                if not lockedTarget then lockedTarget=getNear(root,60) end
+
+                if lockedTarget then local dir=(lockedTarget.Position-root.Position)*Vector3.new(1,0,1) if dir.Magnitude>0 then root.CFrame=CFrame.new(root.Position,Vector3.new(lockedTarget.Position.X,root.Position.Y,lockedTarget.Position.Z)) cam.CFrame=CFrame.new(cam.CFrame.Position,lockedTarget.Position) rushBV.Velocity=dir.Unit*150 end
+
+                else if rushBV then rushBV.Velocity=root.CFrame.LookVector*Vector3.new(1,0,1)*150 end end
+
+            else lockedTarget=nil if rushBV then rushBV.Velocity=root.CFrame.LookVector*Vector3.new(1,0,1)*150 end end
+
+            if tick()-ai>0.1 then img(char) ai=tick() end
+
+            if tick()-sm>0.05 then smoke(root) sm=tick() end
+
+            task.wait(0.03)
+
+        end
+
+        if isDash then
+
+            isDash=false dashAA=false
+
+            if dashT2 then dashT2:Stop(0.1) dashT2=nil end
+
+            if rushBV then rushBV:Destroy() rushBV=nil end
+
+            lockedTarget=nil task.delay(15,function() dashCD=false end)
+
+        end
+
+    end)
+
+end
+
+if ef then ef.ChildAdded:Connect(function(obj) if not isFly then return end local function h(v) if v:IsA("BasePart") then pcall(function() v.Transparency=1 end) end if v:IsA("ParticleEmitter") or v:IsA("Trail") then pcall(function() v.Enabled=false end) end end h(obj) for _,v in ipairs(obj:GetDescendants()) do h(v) end end) end
+
+local df=RS:FindFirstChild("Sounds") and RS.Sounds:FindFirstChild("Naoya") and RS.Sounds.Naoya:FindFirstChild("Decisive")
+
+if df then local function dh(v) if v:IsA("Sound") and(v.Name=="Hit2" or v.Name=="Hit3" or v.Name=="Hit4") then pcall(function() v:Destroy() end) end end for _,v in ipairs(df:GetChildren()) do dh(v) end df.ChildAdded:Connect(dh) end
+
+RN.Heartbeat:Connect(function() if not isFly or not animT then return end if not animT.IsPlaying then animT:Play(0) animT.TimePosition=1.78 animT:AdjustSpeed(0) end end)
+
+RN.Heartbeat:Connect(function() if not sk1A or not lockE then return end local c=ch:FindFirstChild(pl.Name) local r=c and c:FindFirstChild("HumanoidRootPart") if not r then return end r.CFrame=CFrame.new(r.Position,Vector3.new(lockE.Position.X,r.Position.Y,lockE.Position.Z)) workspace.CurrentCamera.CFrame=CFrame.new(workspace.CurrentCamera.CFrame.Position,lockE.Position) end)
+
+local function fly(mr)
+
+    if flyTh then lastHit=tick() return end isFly=true lastHit=tick()
+
+    if animT then animT:Play(0) animT.TimePosition=1.78 animT:AdjustSpeed(0) end
+
+    flyTh=task.spawn(function()
+
+        while tick()-lastHit<0.3 do mr.AssemblyLinearVelocity=mr.CFrame.LookVector*200 task.wait(0.03) end
+
+        mr.AssemblyLinearVelocity=Vector3.new(0,0,0) flyTh=nil isFly=false if animT then animT:AdjustSpeed(1) animT:Stop(0) end
+
+    end)
+
+end
+
+local function setup(char)
+
+    local root=char:WaitForChild("HumanoidRootPart") local hum=char:FindFirstChildOfClass("Humanoid") local anim=hum:WaitForChild("Animator")
+
+    hitC,isFly,sk3,lastHit,sk3T,flyTh=false,false,false,0,0,nil hitConf=false lockE=nil sk1A=false
+
+    local ao=RS.Animations.Itadori.Variants:FindFirstChild("DivergentFist2")
+
+    if ao then animT=anim:LoadAnimation(ao) animT.Priority=Enum.AnimationPriority.Action4 end
+
+    char.DescendantAdded:Connect(function(obj)
+
+        if not obj:IsA("Sound") then return end
+
+        if obj.SoundId=="rbxassetid://6470740758" then
+
+            local near,dist=nil,math.huge
+
+            for _,ec in ipairs(ch:GetChildren()) do if ec.Name~=pl.Name then local eh=ec:FindFirstChildOfClass("Humanoid") local er=ec:FindFirstChild("HumanoidRootPart") or ec:FindFirstChild("Torso") if eh and eh.Health>0 and er then local d=(root.Position-er.Position).Magnitude if d<dist then dist=d near=er end end end end
+
+            if near and dist<=30 then task.spawn(function()
+
+                lockE=near sk1A=true local ep=near.Position local r=math.max((root.Position-ep).Magnitude,3) local a=math.atan2(root.Position.Z-ep.Z,root.Position.X-ep.X)
+
+                for i=1,8 do local ang=a+math.pi*(i/8) local tp=Vector3.new(ep.X+r*math.cos(ang),root.Position.Y,ep.Z+r*math.sin(ang)) root.AssemblyLinearVelocity=(tp-root.Position).Unit*(tp-root.Position).Magnitude/0.03 task.wait(0.03) end
+
+                root.AssemblyLinearVelocity=Vector3.new(0,0,0) task.delay(1,function() sk1A=false lockE=nil end)
+
+            end) end
+
+        end
+
+        if obj.SoundId=="rbxassetid://111770082377892" then
+
+            if hitC then return end hitC=true task.delay(1.5,function() hitC=false end)
+
+            sk3=true sk3T=tick() hitConf=false task.delay(1.5,function() sk3=false end)
+
+            local ss=Instance.new("Sound",root) ss.SoundId="rbxassetid://80881742958967" ss.Volume=5 ss:Play()
+
+            task.spawn(function() task.wait(1) if hitConf then task.delay(10,function() if ss and ss.Parent then ss:Destroy() end end) else if ss and ss.Parent then ss:Stop() ss:Destroy() end end end)
+
+        end
+
+        if obj.Name=="DomainOpen" then
+
+            local us=Instance.new("Sound",root) us.SoundId="rbxassetid://136887216063428" us.Volume=5 us:Play()
+
+            task.delay(10,function() if us and us.Parent then us:Destroy() end end)
+
+        end
+
+    end)
+
+    local function ce(ec)
+
+        if ec.Name==pl.Name then return end local eh=ec:FindFirstChildOfClass("Humanoid") if not eh then return end local lhp=eh.Health
+
+        eh.HealthChanged:Connect(function(np) local dm=lhp-np lhp=np if dm<=0 or not sk3 then return end if tick()-sk3T>1.5 then return end
+
+            local mr=char:FindFirstChild("HumanoidRootPart") local er=ec:FindFirstChild("HumanoidRootPart") or ec:FindFirstChild("Torso") if not mr or not er then return end
+
+            local md=(mr.Position-er.Position).Magnitude if md>10 then return end
+
+            for _,oc in ipairs(ch:GetChildren()) do if oc~=char and oc~=ec then local or2=oc:FindFirstChild("HumanoidRootPart") or oc:FindFirstChild("Torso") if or2 and(or2.Position-er.Position).Magnitude<md-2 then return end end end
+
+            hitConf=true if isDash then stopDashNow() end fly(mr)
+
+        end)
+
+    end
+
+    for _,c in ipairs(ch:GetChildren()) do task.spawn(ce,c) end
+
+    ch.ChildAdded:Connect(function(c) task.wait(0.1) ce(c) end)
+
+end
+
+local function clearBtns()
+
+    local mv=gmv()
+
+    if mv then
+
+        if mv:FindFirstChild("SlotC") then mv.SlotC:Destroy() end
+
+        if mv:FindFirstChild("SlotRush") then mv.SlotRush:Destroy() end
+
+    end
+
+end
+
+local function setupBtns()
+
+    local mv=gmv() if not mv then return end
+
+    if not mv:FindFirstChild("SlotC") then
+
+        local s4=nil for _,c in pairs(mv:GetChildren()) do local k=c:FindFirstChild("Key",true) if k and k:IsA("TextLabel") and k.Text=="4" then s4=c break end end
+
+        if s4 then local sc=s4:Clone() sc.Name="SlotC" sc.Parent=mv sc.Size=UDim2.new(0,50,0,50) sc.Position=s4.Position+UDim2.new(0,58,0,0)
+
+            local tip=sc:FindFirstChild("Tip",true) local cd=sc:FindFirstChild("Cooldown",true)
+
+            if cd then cd.Size=UDim2.new(0,0,0,0) cd.BackgroundTransparency=1 end
+
+            if tip then tip.Text="Play" tip.Visible=true tip.ZIndex=100 end
+
+            local k=sc:FindFirstChild("Key",true) if k then k.Text="C" k.ZIndex=100 end
+
+            local n=sc:FindFirstChild("ItemName",true) if n then n.Text="Music" n.ZIndex=100 end
+
+            local btn=sc:FindFirstChildOfClass("TextButton") or(sc:IsA("GuiButton") and sc) if btn then btn.MouseButton1Click:Connect(function() music(tip) end) end
+
+        end
+
+    end
+
+    if not mv:FindFirstChild("SlotRush") then
+
+        local s1=nil for _,c in pairs(mv:GetChildren()) do local k=c:FindFirstChild("Key",true) if k and k:IsA("TextLabel") and k.Text=="1" then s1=c break end end
+
+        if s1 then
+
+            local sr=s1:Clone() sr.Name="SlotRush" sr.Parent=mv sr.LayoutOrder=0 sr.Size=UDim2.new(0,50,0,50) sr.ZIndex=2
+
+            local k=sr:FindFirstChild("Key",true) if k then k.Text="V" k.ZIndex=10 end
+
+            local n=sr:FindFirstChild("ItemName",true) if n then n.Text="Rush" end
+
+            local tip=sr:FindFirstChild("Tip",true) if tip then tip.Text=rushMode tip.Visible=true tip.ZIndex=100 end
+
+            local dt=sr:FindFirstChild("DTLabel")
+
+            if not dt then local orig=sr:FindFirstChild("ItemName",true) if orig then dt=orig:Clone() dt.Name="DTLabel" dt.Text="Double tap" dt.Position=orig.Position+UDim2.new(0,0,1,2) dt.ZIndex=100 dt.Parent=sr end end
+
+            for _,v in ipairs(sr:GetDescendants()) do if v:IsA("GuiObject") and v.Name~="Cooldown" and v.Name~="DTLabel" then v.ZIndex=10 end end
+
+            local ocd=sr:FindFirstChild("Cooldown",true) if ocd then ocd:Destroy() end
+
+            local cd=Instance.new("Frame",sr) cd.Name="Cooldown" cd.Size=UDim2.new(1,0,0,0) cd.AnchorPoint=Vector2.new(0,1) cd.Position=UDim2.new(0,0,1,0) cd.BackgroundColor3=Color3.fromRGB(0,180,255) cd.BackgroundTransparency=0.3 cd.BorderSizePixel=0 cd.ZIndex=3
+
+            rushCD=cd
+
+            local lastT=0 local tapPending=false
+
+            local btn=sr:FindFirstChildOfClass("TextButton") or(sr:IsA("GuiButton") and sr)
+
+            if btn then btn.ZIndex=10
+
+                btn.MouseButton1Click:Connect(function()
+
+                    local now=tick()
+
+                    if now-lastT<0.35 then
+
+                        tapPending=false rushMode=rushMode=="Lock" and "No" or "Lock"
+
+                        if tip then tip.Text=rushMode end
+
+                        if isDash and rushBV then local char2=ch:FindFirstChild(pl.Name) local root2=char2 and char2:FindFirstChild("HumanoidRootPart") if root2 then if rushMode=="Lock" then lockedTarget=getNear(root2,60) else lockedTarget=nil rushBV.Velocity=root2.CFrame.LookVector*Vector3.new(1,0,1)*150 end end end
+
+                    else tapPending=true task.delay(0.35,function() if tapPending then tapPending=false dash(cd) end end) end
+
+                    lastT=now
+
+                end)
+
+            end
+
+        end
+
+    end
+
+end
+
+local function watchMoveset()
+
+    local mv=gmv() if not mv then return end
+
+    mv.ChildAdded:Connect(function(child)
+
+        if child.Name=="Projection Breaker" then
+
+            task.wait(0.3) clearBtns() task.wait(0.1) setupBtns()
+
+        end
+
+    end)
+
+end
+
+UI.InputBegan:Connect(function(i,g) if g then return end
+
+    if i.KeyCode==Enum.KeyCode.C then local ms=gmv() local sc=ms and ms:FindFirstChild("SlotC") if sc then music(sc:FindFirstChild("Tip",true)) end end
+
+    if i.KeyCode==Enum.KeyCode.V then local ms=gmv() local sr=ms and ms:FindFirstChild("SlotRush") dash(sr and sr:FindFirstChild("Cooldown",true)) end
+
+end)
+
+local mc=ch:FindFirstChild(pl.Name) if mc then task.wait(0.5) setup(mc) end
+
+ch.ChildAdded:Connect(function(c)
+
+    if c.Name==pl.Name then
+
+        task.wait(0.5) setup(c)
+
+        clearBtns() task.wait(0.3) setupBtns()
+
+    end
+
+end)
+
+task.spawn(function() task.wait(2) watchMoveset() end)
+
+task.spawn(function() while true do setupBtns() task.wait(2) end end)
