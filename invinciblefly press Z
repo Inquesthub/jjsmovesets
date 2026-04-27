@@ -1,0 +1,449 @@
+local player = game:GetService("Players").LocalPlayer
+
+local RunService = game:GetService("RunService")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local UserInputService = game:GetService("UserInputService")
+
+local TweenService = game:GetService("TweenService")
+
+local camera = workspace.CurrentCamera
+
+local flySpeed = 150 
+
+local flying = false
+
+local flyConnection, bv, bg
+
+local vfxID = 16703877340
+
+local currentVFX = nil
+
+local forwardTimer = 0 
+
+local NORMAL_FOV = 70
+
+local FAST_FOV = 95 
+
+local soundID = "rbxassetid://596046130"
+
+local boostSound = Instance.new("Sound")
+
+boostSound.SoundId = soundID
+
+boostSound.Volume = 5
+
+boostSound.Looped = true 
+
+local anims = {
+
+    idle = ReplicatedStorage:WaitForChild("Animations"):WaitForChild("Mechamaru"):WaitForChild("Offloads"):WaitForChild("SmoothLanding2"),
+
+    forward = ReplicatedStorage:WaitForChild("Animations"):WaitForChild("Heian"):WaitForChild("Cleave"),
+
+    backward = ReplicatedStorage:WaitForChild("Animations"):WaitForChild("Gojo"):WaitForChild("TwofoldHit")
+
+}
+
+local tracks = {}
+
+local currentTrack = nil
+
+local function removeVFX()
+
+    if currentVFX then
+
+        currentVFX:Destroy()
+
+        currentVFX = nil
+
+    end
+
+    forwardTimer = 0
+
+end
+
+local function spawnVFX(root)
+
+    if currentVFX then return end
+
+    local objects = game:GetObjects("rbxassetid://"..vfxID)
+
+    local vfx = objects[1]
+
+    if vfx then
+
+        for _, v in pairs(vfx:GetDescendants()) do
+
+            if v:IsA("BasePart") then
+
+                v.CanCollide = false
+
+                v.Massless = true
+
+                if v.Name:lower():find("head") or v.Name:lower():find("torso") or v.Name:lower():find("arm") or v.Name:lower():find("leg") then
+
+                    v.Transparency = 1
+
+                end
+
+            elseif v:IsA("Humanoid") or v:IsA("Decal") then
+
+                v:Destroy()
+
+            end
+
+        end
+
+        vfx.Parent = player.Character
+
+        local main = vfx:IsA("BasePart") and vfx or vfx.PrimaryPart or vfx:FindFirstChildWhichIsA("BasePart")
+
+        if main then
+
+            main.CFrame = root.CFrame * CFrame.new(0, 0, -5) * CFrame.Angles(math.rad(90), 0, 0)
+
+            local weld = Instance.new("WeldConstraint")
+
+            weld.Part0 = root
+
+            weld.Part1 = main
+
+            weld.Parent = main
+
+        end
+
+        currentVFX = vfx
+
+    end
+
+end
+
+local function setPose(trackName, timePos)
+
+    local target = tracks[trackName]
+
+    if not target or currentTrack == target then return end
+
+    if currentTrack then currentTrack:Stop(0.1) end
+
+    
+
+    target:Play(0.1)
+
+    target.TimePosition = timePos
+
+    target:AdjustSpeed(0)
+
+    currentTrack = target
+
+end
+
+local function updateFOV(target)
+
+    TweenService:Create(camera, TweenInfo.new(0.5), {FieldOfView = target}):Play()
+
+end
+
+local function getMoveVec()
+
+    local success, control = pcall(function()
+
+        return require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
+
+    end)
+
+    return success and control:GetMoveVector() or Vector3.new(0,0,0)
+
+end
+
+local function toggleFly()
+
+    local char = player.Character
+
+    local root = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if not root or not hum then return end
+
+    
+
+    flying = not flying
+
+    boostSound.Parent = root 
+
+    if flying then
+
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+        hum.PlatformStand = true
+
+        
+
+        tracks.idle = hum:LoadAnimation(anims.idle)
+
+        tracks.forward = hum:LoadAnimation(anims.forward)
+
+        tracks.backward = hum:LoadAnimation(anims.backward)
+
+        for _, t in pairs(tracks) do t.Priority = Enum.AnimationPriority.Action end
+
+        
+
+        setPose("idle", 0.5)
+
+        
+
+        bv = Instance.new("BodyVelocity", root)
+
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+
+        bg = Instance.new("BodyGyro", root)
+
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+
+        bg.P = 20000 
+
+        flyConnection = RunService.Heartbeat:Connect(function(dt)
+
+            hum.PlatformStand = true 
+
+            
+
+            local moveVec = getMoveVec()
+
+            
+
+            if moveVec.Z < -0.5 and math.abs(moveVec.X) < 0.5 then
+
+                forwardTimer = forwardTimer + dt
+
+                if forwardTimer >= 2 then
+
+                    spawnVFX(root)
+
+                end
+
+            else
+
+                removeVFX()
+
+            end
+
+            if moveVec.Magnitude > 0 then
+
+                if moveVec.Z < -0.5 then 
+
+                    setPose("forward", 1.5)
+
+                    updateFOV(FAST_FOV)
+
+                elseif moveVec.Z > 0.5 then 
+
+                    setPose("backward", 0.7)
+
+                    updateFOV(NORMAL_FOV)
+
+                else 
+
+                    setPose("idle", 0.5)
+
+                    updateFOV(NORMAL_FOV)
+
+                end
+
+                
+
+                if not boostSound.IsPlaying then boostSound:Play() end
+
+                bv.Velocity = camera.CFrame:VectorToWorldSpace(moveVec).Unit * flySpeed
+
+            else
+
+                removeVFX()
+
+                setPose("idle", 0.5)
+
+                updateFOV(NORMAL_FOV)
+
+                if boostSound.IsPlaying then boostSound:Stop() end
+
+                bv.Velocity = Vector3.new(0,0,0)
+
+            end
+
+            bg.CFrame = camera.CFrame
+
+        end)
+
+    else
+
+        removeVFX()
+
+        if flyConnection then flyConnection:Disconnect() end
+
+        if bv then bv:Destroy() end
+
+        if bg then bg:Destroy() end
+
+        updateFOV(NORMAL_FOV)
+
+        boostSound:Stop()
+
+        for _, t in pairs(tracks) do t:Stop() t:Destroy() end
+
+        tracks = {}; currentTrack = nil
+
+        hum.PlatformStand = false
+
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+    end
+
+end
+
+local function setupButton()
+
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    local mainGui = playerGui:WaitForChild("Main")
+
+    local moveset = mainGui:WaitForChild("Moveset")
+
+    
+
+    if moveset:FindFirstChild("FlySkill") then moveset.FlySkill:Destroy() end
+
+    local sample = moveset:FindFirstChild("1") or moveset:FindFirstChild("2") or moveset:FindFirstChild("3") or moveset:FindFirstChild("4")
+
+    
+
+    if not sample then
+
+        for _, child in pairs(moveset:GetChildren()) do
+
+            if child:IsA("Frame") or child:IsA("TextButton") then
+
+                sample = child; break
+
+            end
+
+        end
+
+    end
+
+    if not sample then return end
+
+    local flyBtn = sample:Clone()
+
+    flyBtn.Name = "FlySkill"
+
+    flyBtn.Parent = moveset
+
+    if flyBtn:FindFirstChild("Tip") then flyBtn.Tip:Destroy() end
+
+    if flyBtn:FindFirstChild("Cooldown") then flyBtn.Cooldown:Destroy() end
+
+    flyBtn.Size = UDim2.new(sample.Size.X.Scale * 0.75, 0, sample.Size.Y.Scale * 0.75, 0)
+
+    if flyBtn:FindFirstChild("ItemName") then flyBtn.ItemName.Text = "Fly" end
+
+    if flyBtn:FindFirstChild("Key") then flyBtn.Key.Text = "C" end
+
+    flyBtn.LayoutOrder = 100 
+
+    local actualBtn = flyBtn:IsA("TextButton") and flyBtn or flyBtn:FindFirstChildOfClass("TextButton")
+
+    if actualBtn then
+
+        actualBtn.MouseButton1Click:Connect(toggleFly)
+
+    else
+
+        flyBtn.InputBegan:Connect(function(input)
+
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+
+                toggleFly()
+
+            end
+
+        end)
+
+    end
+
+end
+
+setupButton()
+
+player.CharacterAdded:Connect(function()
+
+    flying = false
+
+    removeVFX()
+
+    boostSound:Stop()
+
+    task.wait(2)
+
+    setupButton()
+
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+
+    if not gpe and input.KeyCode == Enum.KeyCode.Z then
+
+        toggleFly()
+
+    end
+
+end)
+
+local player = game.Players.LocalPlayer
+
+local function cleanAssets(character)
+
+    if not character then return end
+
+    
+
+    local setAssets = character:WaitForChild("SetAssets", 5)
+
+    
+
+    if setAssets then
+
+        setAssets.ChildAdded:Connect(function(child)
+
+            if child.Name == "HeianArms" or child.Name == "LocustWing" then
+
+                task.wait()
+
+                child:Destroy()
+
+            end
+
+        end)
+
+        if setAssets:FindFirstChild("HeianArms") then setAssets.HeianArms:Destroy() end
+
+        if setAssets:FindFirstChild("LocustWing") then setAssets.LocustWing:Destroy() end
+
+    end
+
+end
+
+if player.Character then
+
+    cleanAssets(player.Character)
+
+end
+
+player.CharacterAdded:Connect(function(newCharacter)
+
+    cleanAssets(newCharacter)
+
+end)
