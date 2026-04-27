@@ -66,9 +66,9 @@ local function stopDashNow()
 
     lockedTarget=nil dashCD=true
 
-    if rushCD then rushCD.Size=UDim2.new(1,0,1,0) rushCD.BackgroundColor3=Color3.fromRGB(0,180,255) rushCD.BackgroundTransparency=0.3 TS:Create(rushCD,TweenInfo.new(22,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
+    if rushCD then rushCD.Size=UDim2.new(1,0,1,0) rushCD.BackgroundColor3=Color3.fromRGB(0,180,255) rushCD.BackgroundTransparency=0.3 TS:Create(rushCD,TweenInfo.new(7,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
 
-    task.delay(15,function() dashCD=false end)
+    
 
 end
 
@@ -119,8 +119,8 @@ local function dash(cd)
     local char=ch:FindFirstChild(pl.Name) local root=char and char:FindFirstChild("HumanoidRootPart") local hum=char and char:FindFirstChildOfClass("Humanoid") if not root or not hum then return end
 
     isDash=true dashCD=true rushCD=cd
-
-    if cd then cd.Size=UDim2.new(1,0,1,0) cd.BackgroundColor3=Color3.fromRGB(0,180,255) cd.BackgroundTransparency=0.3 TS:Create(cd,TweenInfo.new(22,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
+    task.delay(7,function() dashCD=false end) 
+    if cd then cd.Size=UDim2.new(1,0,1,0) cd.BackgroundColor3=Color3.fromRGB(0,180,255) cd.BackgroundTransparency=0.3 TS:Create(cd,TweenInfo.new(7,Enum.EasingStyle.Linear),{Size=UDim2.new(1,0,0,0)}):Play() end
 
     task.spawn(function()
 
@@ -182,7 +182,7 @@ local function dash(cd)
 
             if rushBV then rushBV:Destroy() rushBV=nil end
 
-            lockedTarget=nil task.delay(15,function() dashCD=false end)
+            
 
         end
 
@@ -342,7 +342,7 @@ local function setupBtns()
 
             local sr=s1:Clone() sr.Name="SlotRush" sr.Parent=mv sr.LayoutOrder=0 sr.Size=UDim2.new(0,50,0,50) sr.ZIndex=2
 
-            local k=sr:FindFirstChild("Key",true) if k then k.Text="V" k.ZIndex=10 end
+            local k=sr:FindFirstChild("Key",true) if k then k.Text="Z" k.ZIndex=10 end
 
             local n=sr:FindFirstChild("ItemName",true) if n then n.Text="Rush" end
 
@@ -412,7 +412,7 @@ UI.InputBegan:Connect(function(i,g) if g then return end
 
     if i.KeyCode==Enum.KeyCode.C then local ms=gmv() local sc=ms and ms:FindFirstChild("SlotC") if sc then music(sc:FindFirstChild("Tip",true)) end end
 
-    if i.KeyCode==Enum.KeyCode.V then local ms=gmv() local sr=ms and ms:FindFirstChild("SlotRush") dash(sr and sr:FindFirstChild("Cooldown",true)) end
+    if i.KeyCode==Enum.KeyCode.Z then local ms=gmv() local sr=ms and ms:FindFirstChild("SlotRush") dash(sr and sr:FindFirstChild("Cooldown",true)) end
 
 end)
 
